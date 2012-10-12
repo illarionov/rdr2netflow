@@ -33,20 +33,21 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "rdr.h"
 
 static int get_string_field(uint8_t *pkt, size_t pkt_size,
-      unsigned *field_pos, char *dst, size_t dst_buf_size);
-static int get_int8_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, int *res);
-static int get_uint8_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, unsigned *res);
-static int get_int16_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, int *res);
-static int get_uint16_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, unsigned *res);
-static int get_int32_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, int *res);
-static int get_uint32_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, unsigned *res);
-static int get_ip_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, struct in_addr *ip);
-static int get_time_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, time_t *time);
+      size_t *field_pos, char *dst, size_t dst_buf_size);
+static int get_int8_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, int *res);
+static int get_uint8_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, unsigned *res);
+static int get_int16_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, int *res);
+static int get_uint16_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, unsigned *res);
+static int get_int32_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, int *res);
+static int get_uint32_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, unsigned *res);
+static int get_ip_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, struct in_addr *ip);
+static int get_time_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, time_t *time);
 
 /*
  * >0 - RDR packet (size)
@@ -248,7 +249,7 @@ int decode_rdr_packet(void *data, size_t data_size, struct rdr_packet_t *res)
 }
 
 static int get_string_field(uint8_t *pkt, size_t pkt_size,
-      unsigned *field_pos, char *dst, size_t dst_buf_size)
+      size_t *field_pos, char *dst, size_t dst_buf_size)
 {
    struct rdrv1_field_t *field;
    size_t string_size;
@@ -280,7 +281,7 @@ static int get_string_field(uint8_t *pkt, size_t pkt_size,
    return string_size+sizeof(*field);
 }
 
-static int get_int8_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, int *res)
+static int get_int8_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, int *res)
 {
    struct rdrv1_field_t *field;
    size_t payload_size;
@@ -312,7 +313,7 @@ static int get_int8_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, in
    return payload_size+sizeof(*field);
 }
 
-static int get_uint8_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, unsigned *res)
+static int get_uint8_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, unsigned *res)
 {
    struct rdrv1_field_t *field;
    size_t payload_size;
@@ -344,7 +345,7 @@ static int get_uint8_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, u
    return payload_size+sizeof(*field);
 }
 
-static int get_int16_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, int *res)
+static int get_int16_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, int *res)
 {
    struct rdrv1_field_t *field;
    size_t payload_size;
@@ -382,7 +383,7 @@ static int get_int16_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, i
    return payload_size+sizeof(*field);
 }
 
-static int get_uint16_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, unsigned *res)
+static int get_uint16_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, unsigned *res)
 {
    struct rdrv1_field_t *field;
    size_t payload_size;
@@ -416,7 +417,7 @@ static int get_uint16_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, 
    return payload_size+sizeof(*field);
 }
 
-static int get_int32_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, int *res)
+static int get_int32_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, int *res)
 {
    struct rdrv1_field_t *field;
    size_t payload_size;
@@ -454,7 +455,7 @@ static int get_int32_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, i
    return payload_size+sizeof(*field);
 }
 
-static int get_uint32_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, unsigned *res)
+static int get_uint32_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, unsigned *res)
 {
    struct rdrv1_field_t *field;
    size_t payload_size;
@@ -490,7 +491,7 @@ static int get_uint32_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, 
    return payload_size+sizeof(*field);
 }
 
-static int get_ip_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, struct in_addr *ip)
+static int get_ip_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, struct in_addr *ip)
 {
    int res;
    unsigned tmp_ip;
@@ -504,7 +505,7 @@ static int get_ip_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, stru
    return res;
 }
 
-static int get_time_field(uint8_t *pkt, size_t pkt_size, unsigned *field_pos, time_t *time)
+static int get_time_field(uint8_t *pkt, size_t pkt_size, size_t *field_pos, time_t *time)
 {
    int res;
    unsigned tmp_time;

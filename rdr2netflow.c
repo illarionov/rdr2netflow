@@ -353,7 +353,7 @@ static int flush_netflow_dgram(struct ctx_t *ctx, struct rdr_session_ctx_t *sess
 
    session->netflow.records_count = 0;
 
-   return 0;
+   return res;
 }
 
 static void flush_all_netflow_sessions(struct ctx_t *ctx)
@@ -399,8 +399,8 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
 
    if (pkt.rdr.transaction_usage.report_time < session->netflow.first_packet_ts) {
       if (ctx->opts.verbose)
-	 fprintf(stderr, "Time went backwards. %u => %u\n", session->netflow.first_packet_ts,
-	       pkt.rdr.transaction_usage.report_time);
+	 fprintf(stderr, "Time went backwards. %u => %u\n", (unsigned)session->netflow.first_packet_ts,
+	       (unsigned)pkt.rdr.transaction_usage.report_time);
       session->netflow.first_packet_ts = pkt.rdr.transaction_usage.report_time;
    }
 
