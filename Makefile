@@ -15,5 +15,5 @@ rdr2netflow: rdr.h netflow.h rdr2netflow.c
 
 install:
 	mkdir -p ${DESTDIR}/bin 2> /dev/null
-	install -d -o root -g wheel -m 755 rdr2netflow ${DESTDIR}/bin
+	install -D -o root -g root -m 755 rdr2netflow ${DESTDIR}/bin
 
