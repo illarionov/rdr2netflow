@@ -310,7 +310,7 @@ static int accept_connection(struct ctx_t *ctx)
    session->netflow.dgram.header.sys_uptime = 0;
    session->netflow.dgram.header.engine_type = 0;
    session->netflow.dgram.header.engine_id = 0;
-   session->netflow.dgram.header.pad = 0;
+   session->netflow.dgram.header.sampling_int = 0;
 
    session->next = ctx->rdr_sessions;
    ctx->rdr_sessions = session;

@@ -71,7 +71,7 @@ struct netflow_v5_header
   uint32_t flow_seq;	/* Sequence number of the first record */
   uint8_t engine_type;	/* Type of flow switching engine (RP,VIP,etc.) */
   uint8_t engine_id;	/* Slot number of the flow switching engine */
-  uint16_t pad;		/* Pad to word boundary */
+  uint16_t sampling_int; /* First two bits hold the sampling mode; remaining 14 bits hold value of sampling interval */
 } __attribute__((__packed__));
 
 struct netflow_v9_header
