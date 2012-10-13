@@ -739,9 +739,6 @@ int main(int argc, char *argv[])
    signal(SIGINT, sig_quit);
    signal(SIGTERM, sig_quit);
 
-   netflow_flush_tmout.tv_sec = DEFAULT_NETFLOW_FLUSH_TMOUT;
-   netflow_flush_tmout.tv_usec = 0;
-
    for (;!quit;) {
       struct rdr_session_ctx_t *session;
       int ready_cnt;
@@ -749,6 +746,9 @@ int main(int argc, char *argv[])
       fd_set readfds;
 
       readfds = ctx->rdr_fdset;
+
+      netflow_flush_tmout.tv_sec = DEFAULT_NETFLOW_FLUSH_TMOUT;
+      netflow_flush_tmout.tv_usec = 0;
 
       ready_cnt = select(ctx->rdr_maxfd+1, &readfds, NULL, NULL, &netflow_flush_tmout);
 
