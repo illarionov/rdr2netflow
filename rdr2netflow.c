@@ -371,6 +371,7 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
 {
    int err;
    unsigned long long uptime;
+   unsigned duration;
    struct rdr_packet_t pkt;
    struct netflow_v5_export_dgram *dg;
    struct netflow_v5_record *rc;
@@ -394,19 +395,33 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
    if (pkt.header.tag != TRANSACTION_USAGE_RDR)
       return 0;
 
-   if (session->netflow.first_packet_ts == 0)
-      session->netflow.first_packet_ts = pkt.rdr.transaction_usage.report_time;
+   duration = (pkt.rdr.transaction_usage.millisec_duration / 1000)
+      + ((pkt.rdr.transaction_usage.millisec_duration % 1000 == 0) ? 0 : 1);
+
+   if (pkt.rdr.transaction_usage.report_time < duration) {
+      duration = 0;
+   }
+
+   if ( (session->netflow.first_packet_ts == 0)
+	 || (pkt.rdr.transaction_usage.report_time - duration < session->netflow.first_packet_ts)
+	 ) {
+      session->netflow.first_packet_ts = pkt.rdr.transaction_usage.report_time - duration;
+   }
 
    if (pkt.rdr.transaction_usage.report_time < session->netflow.first_packet_ts) {
       if (ctx->opts.verbose)
 	 fprintf(stderr, "Time went backwards. %u => %u\n", (unsigned)session->netflow.first_packet_ts,
 	       (unsigned)pkt.rdr.transaction_usage.report_time);
-      session->netflow.first_packet_ts = pkt.rdr.transaction_usage.report_time;
+      session->netflow.first_packet_ts = pkt.rdr.transaction_usage.report_time - duration;
    }
 
    session->netflow.last_packet_ts = pkt.rdr.transaction_usage.report_time;
 
+   assert(session->netflow.last_packet_ts >= session->netflow.first_packet_ts);
+
    uptime = 1000*(session->netflow.last_packet_ts - session->netflow.first_packet_ts) + 1;
+
+   assert(uptime >= pkt.rdr.transaction_usage.millisec_duration);
 
    dg = &session->netflow.dgram;
 
