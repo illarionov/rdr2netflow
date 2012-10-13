@@ -1,0 +1,92 @@
+RDR 2 Netflow
+==============
+
+Программа принимает поток формата RDRv1 с Cisco SCE - экспортера, преобразует
+его в формат Netflow v5 и отправляет на Netflow коллектор.
+
+Установка
+==========
+
+   $ git clone git://github.com/littlesavage/rdr2netflow.git
+   $ cd rdr2netflow
+   $ make
+   $ su
+   # make install
+
+Для конечной установки рекомендуется использовать систему инициализации с
+возможностью автоматического перезапуска: Daemontools, Runit, Launchd, Upstart,
+либо Supervisor.
+При большом трафике также рекомендуется увеличить размер приемного буфера
+(ключ -b), предварительно увеличив ограничение ОС - net.core.rmem_max в Linux,
+kern.ipc.maxsockbuf во FreeBSD.
+
+Пример запуска из runit:
+
+   $ cat /etc/service/rdr2netflow/run
+   #!/bin/sh
+   exec 2>&1
+   exec chpst -u nobody /usr/local/bin/rdr2netflow -s 192.168.1.202 -p 9999 \
+      -d 127.0.0.1 -P 9995 -V 1 -b 16777216
+
+   $ cat /etc/service/rdr2netflow/log/run
+   #!/bin/sh
+   exec chpst -u log svlogd -tt /var/log/rrd2netflow
+
+Использование
+==============
+
+Usage:
+    rdr2netflow [-h] [options]
+
+Options:
+    -s <address>    Address to bind for listening (default any)
+    -p <port>       Specifies the port number to listen (default 10000)
+    -d <address>    Send netflow to this remote host (default 127.0.0.1)
+    -P <port>       Remote port (default 9995)
+    -b <size>       Set send buffer size in bytes.
+    -V <level>      Verbose output
+    -h, --help      Help
+    -v, --version   Show version
+
+-s и -p задают IP адрес и порт, на котором будет приниматься RDRv1 поток (TCP).
+-d и -P задают адрес и порт Netflow V5 коллектора (UDP).
+-V задает уровень подробности логов:
+   -V 1   - минимальный уровень
+   -V 10  - дамп всех пакетов RDR TRANSACTION USAGE (TUR) и заголовков остальных RDR.
+   -V 100 - подробный дамп всех RDR пакетов.
+
+Пример
+
+ Принимать RDR на 192.168.1.202:9999 и отправлять Netflow на 127.0.0.1:9995:
+
+   $ rdr2netflow -s 192.168.1.202 -p 9999 -d 127.0.0.1 -P 9995 -V 1
+
+Известные ограничения и недоработки
+====================================
+
+ Не заполняются поля Netflow: nexthop, input_if, output_if, pkts, tcp_flags,
+tos, src_as, dst_as, src_mask, dst_mask. Если вы знаете, где в RDR
+значения каких-либо из этих полей, сообщите нам.
+
+ Поле Netflow sys_uptime - это не uptime экспортера, а время самого раннего
+потока с момента запуска rdr2netflow.
+
+ Поле Netflow last (uptime во время приема последнего пакета)
+вычисляется из REPORT_TIME RDR. Т.е. это не время последнего пакета и точность
+здесь секундная.
+
+ rdr2netflow может принимать потоки с нескольких экспортеров, но отправляться
+они будут на один коллектор с одним и тем же engineID|engineType.
+
+ При включенных RDR interim TUR, в промежуточных TUR'ах счетчики
+SESSION_UPSTREAM_VOLUME и SESSION_DOWNSTREAM_VOLUME обнуляются после каждого
+отчета, а MILLISEC_DURATION продолжает накапливаться. На данный промежуточные
+TUR экспортируются в netflow, но длительность потока вычисляется неверно.
+
+Авторы
+=======
+
+Александр Морозов
+
+Алексей Илларионов <littlesavage@rambler.ru>
+
