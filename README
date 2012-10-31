@@ -43,6 +43,7 @@ Options:
     -p <port>       Specifies the port number to listen (default 10000)
     -d <address>    Send netflow to this remote host (default 127.0.0.1)
     -P <port>       Remote port (default 9995)
+    -R <host/port>  RDR Repeater: send all incoming packets to this host
     -b <size>       Set send buffer size in bytes.
     -V <level>      Verbose output
     -h, --help      Help
@@ -54,6 +55,10 @@ Options:
    -V 1   - минимальный уровень
    -V 10  - дамп всех пакетов RDR TRANSACTION USAGE (TUR) и заголовков остальных RDR.
    -V 100 - подробный дамп всех RDR пакетов.
+
+-R host/port - Отправлять принятый RDR поток на заданных узел. Порт назначения
+указывается через '/'. Можно указать несколько раз, чтобы отправлять на
+несколько хостов ожновременно.
 
 Пример
 
@@ -82,6 +87,7 @@ tos, src_as, dst_as, src_mask, dst_mask. Если вы знаете, где в R
 SESSION_UPSTREAM_VOLUME и SESSION_DOWNSTREAM_VOLUME обнуляются после каждого
 отчета, а MILLISEC_DURATION продолжает накапливаться. На данный промежуточные
 TUR экспортируются в netflow, но длительность потока вычисляется неверно.
+
 
 Авторы
 =======

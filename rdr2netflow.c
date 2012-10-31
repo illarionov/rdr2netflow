@@ -41,10 +41,11 @@
 #include <unistd.h>
 
 #include "rdr.h"
+#include "repeater.h"
 #include "netflow.h"
 
 const char *progname = "rdr2netflow";
-const char *revision = "$Revision: 0.1 $";
+const char *revision = "$Revision: 0.2 $";
 
 #define DEFAULT_SRC_PORT   10000
 #define DEFAULT_DST_IP     "127.0.0.1"
@@ -84,6 +85,8 @@ struct rdr_session_ctx_t {
 
 struct ctx_t {
    struct opts_t opts;
+
+   struct rdr_repeater_ctx_t *rdr_repeater;
 
    struct sockaddr_in src_addr;
    struct sockaddr_in dst_addr;
@@ -127,6 +130,7 @@ static void help(void)
    "    -p <port>       Specifies the port number to listen (default %u)\n"
    "    -d <address>    Send netflow to this remote host (default %s)\n"
    "    -P <port>       Remote port (default %u)\n"
+   "    -R <host/port>  RDR Repeater: send all incoming packets to this host\n"
    "    -b <size>       Set send buffer size in bytes.\n"
    "    -V <level>      Verbose output\n"
    "    -h, --help                  Help\n"
@@ -155,6 +159,9 @@ static struct ctx_t *init_ctx()
    Ctx.rdr_sessions = NULL;
    Ctx.rdr_maxfd = 0;
    FD_ZERO(&Ctx.rdr_fdset);
+   Ctx.rdr_repeater = rdr_repeater_init();
+   if (Ctx.rdr_repeater == NULL)
+      return NULL;
 
    return &Ctx;
 }
@@ -177,6 +184,9 @@ static void free_ctx(struct ctx_t *ctx)
 
    ctx->rdr_maxfd = 0;
    FD_ZERO(&ctx->rdr_fdset);
+
+   rdr_repeater_destroy(ctx->rdr_repeater);
+   ctx->rdr_repeater = NULL;
 
 }
 
@@ -371,7 +381,7 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
 {
    int err;
    unsigned long long uptime;
-   unsigned duration;
+   int duration;
    struct rdr_packet_t pkt;
    struct netflow_v5_export_dgram *dg;
    struct netflow_v5_record *rc;
@@ -589,6 +599,8 @@ static int read_data(struct ctx_t *ctx, struct rdr_session_ctx_t *session)
 	 break;
       }
 
+      rdr_repeater_append(ctx->rdr_repeater, &session->buf[session->pos], rcvd);
+
       session->pos += rcvd;
       rcvd_total += rcvd;
 
@@ -653,6 +665,7 @@ int main(int argc, char *argv[])
       {NULL,      required_argument, 0, 'p'},
       {NULL,      required_argument, 0, 'd'},
       {NULL,      required_argument, 0, 'P'},
+      {NULL,      required_argument, 0, 'R'},
       {NULL,      required_argument, 0, 'b'},
       {0, 0, 0, 0}
    };
@@ -660,7 +673,7 @@ int main(int argc, char *argv[])
    ctx = init_ctx();
    assert(ctx);
 
-   while ((c = getopt_long(argc, argv, "vhV:s:p:d:P:b:",longopts,NULL)) != -1) {
+   while ((c = getopt_long(argc, argv, "vhV:s:p:d:P:R:b:",longopts,NULL)) != -1) {
       switch (c) {
 	 case 's':
 	    if (inet_aton(optarg, &ctx->opts.src_addr) <= 0) {
@@ -690,6 +703,12 @@ int main(int argc, char *argv[])
 	    if (ctx->opts.dst_port == 0
 		  || (ctx->opts.dst_port > 0xffff)) {
 	       fprintf(stderr, "Incorrent source port\n");
+	       free_ctx(ctx);
+	       return 1;
+	    }
+	    break;
+	 case 'R':
+	    if (rdr_repeater_add_endpoint(ctx->rdr_repeater, optarg, stderr) < 0) {
 	       free_ctx(ctx);
 	       return 1;
 	    }
@@ -735,6 +754,12 @@ int main(int argc, char *argv[])
       return -1;
    }
 
+   /* RDR Repeater */
+   if (rdr_repeater_init_connection(ctx->rdr_repeater, ctx->opts.s_bufsize, ctx->opts.verbose) < 0) {
+      free_ctx(ctx);
+      return -1;
+   }
+
    signal(SIGHUP, sig_quit);
    signal(SIGINT, sig_quit);
    signal(SIGTERM, sig_quit);
@@ -742,15 +767,22 @@ int main(int argc, char *argv[])
    for (;!quit;) {
       struct rdr_session_ctx_t *session;
       int ready_cnt;
+      int maxfd;
 
       fd_set readfds;
+      fd_set writefds;
 
       readfds = ctx->rdr_fdset;
+      FD_ZERO(&writefds);
+      rdr_repeater_on_select(ctx->rdr_repeater, &readfds, &writefds, &maxfd);
+
+      if (ctx->rdr_maxfd > maxfd)
+	 maxfd = ctx->rdr_maxfd;
 
       netflow_flush_tmout.tv_sec = DEFAULT_NETFLOW_FLUSH_TMOUT;
       netflow_flush_tmout.tv_usec = 0;
 
-      ready_cnt = select(ctx->rdr_maxfd+1, &readfds, NULL, NULL, &netflow_flush_tmout);
+      ready_cnt = select(maxfd+1, &readfds, &writefds, NULL, &netflow_flush_tmout);
 
       if (quit)
 	 break;
@@ -758,14 +790,17 @@ int main(int argc, char *argv[])
       if (ready_cnt < 0)
 	 break;
 
-      if (ready_cnt ==0) {
+      if (ready_cnt == 0) {
 	 flush_all_netflow_sessions(ctx);
+	 rdr_repeater_step(ctx->rdr_repeater, &readfds, &writefds);
 	 continue;
       }
 
       if (FD_ISSET(ctx->rcv_s, &readfds)) {
 	 accept_connection(ctx);
       }
+
+      rdr_repeater_step(ctx->rdr_repeater, &readfds, &writefds);
 
       session=ctx->rdr_sessions;
       while (session != NULL) {
