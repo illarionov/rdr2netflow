@@ -44,6 +44,7 @@ Options:
     -d <address>    Send netflow to this remote host (default 127.0.0.1)
     -P <port>       Remote port (default 9995)
     -R <host/port>  RDR Repeater: send all incoming packets to this host
+    -F ip[/net][,...] Comma-separated list of networks to be excluded from the dump
     -b <size>       Set send buffer size in bytes.
     -V <level>      Verbose output
     -h, --help      Help
@@ -58,7 +59,9 @@ Options:
 
 -R host/port - Отправлять принятый RDR поток на заданных узел. Порт назначения
 указывается через '/'. Можно указать несколько раз, чтобы отправлять на
-несколько хостов ожновременно.
+несколько хостов одновременно.
+-E ip[/net][,...] - IP фильтр. Разделенный запятыми список IP сетей, которые будут
+исключены из Netflow дампа.
 
 Пример
 

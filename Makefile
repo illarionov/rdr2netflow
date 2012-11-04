@@ -4,14 +4,20 @@ CFLAGS=-W  -Wall -g -O0
 
 DESTDIR?=/usr/local
 
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Linux)
+   LDFLAGS+= -Wl,--as-needed -lrt -lresolv
+endif
+
 all: rdr2netflow
 
 clean:
 	rm -f *.o rdr2netflow
 
 rdr2netflow: rdr.h netflow.h repeater.h rdr.c repeater.c rdr2netflow.c
-	$(CC) $(CFLAGS) $(LDFLAGS) rdr2netflow.c rdr.c repeater.c \
-	   -o rdr2netflow -Wl,--as-needed -lrt
+	$(CC) $(CFLAGS) rdr2netflow.c rdr.c repeater.c \
+	   -o rdr2netflow $(LDFLAGS)
 
 install:
 	mkdir -p ${DESTDIR}/bin 2> /dev/null

@@ -53,6 +53,7 @@ const char *revision = "$Revision: 0.2 $";
 
 #define DEFAULT_NETFLOW_FLUSH_TMOUT 3
 
+
 struct opts_t {
    struct in_addr src_addr;
    unsigned src_port;
@@ -63,6 +64,13 @@ struct opts_t {
    unsigned s_bufsize;
 
    int verbose;
+
+   struct ipfilter_item_t {
+      in_addr_t net;
+      in_addr_t mask;
+      struct ipfilter_item_t *next;
+   } *ip_filter;
+
 };
 
 struct rdr_session_ctx_t {
@@ -102,6 +110,8 @@ struct ctx_t {
 
 
 static struct rdr_session_ctx_t *remove_session(struct ctx_t *ctx, struct rdr_session_ctx_t *session);
+static int ip_filter_add_networks(struct ctx_t *ctx, char *optarg);
+static inline unsigned is_ip_filtered(struct ctx_t *ctx, in_addr_t src_ip, in_addr_t dst_ip);
 
 static volatile sig_atomic_t quit = 0;
 
@@ -131,6 +141,7 @@ static void help(void)
    "    -d <address>    Send netflow to this remote host (default %s)\n"
    "    -P <port>       Remote port (default %u)\n"
    "    -R <host/port>  RDR Repeater: send all incoming packets to this host\n"
+   "    -F ip[/net][,...] Comma-separated list of networks to be excluded from the dump\n"
    "    -b <size>       Set send buffer size in bytes.\n"
    "    -V <level>      Verbose output\n"
    "    -h, --help                  Help\n"
@@ -156,6 +167,7 @@ static struct ctx_t *init_ctx()
    Ctx.opts.src_port = 0;
    Ctx.opts.dst_port = 0;
    Ctx.opts.s_bufsize = 0;
+   Ctx.opts.ip_filter = NULL;
    Ctx.rdr_sessions = NULL;
    Ctx.rdr_maxfd = 0;
    FD_ZERO(&Ctx.rdr_fdset);
@@ -168,6 +180,7 @@ static struct ctx_t *init_ctx()
 
 static void free_ctx(struct ctx_t *ctx)
 {
+
    if (ctx == NULL)
       return;
 
@@ -181,6 +194,13 @@ static void free_ctx(struct ctx_t *ctx)
 
    while (ctx->rdr_sessions != NULL)
       remove_session(ctx, ctx->rdr_sessions);
+
+   while (ctx->opts.ip_filter != NULL) {
+      struct ipfilter_item_t *i;
+      i = ctx->opts.ip_filter;
+      ctx->opts.ip_filter = i->next;
+      free(i);
+   }
 
    ctx->rdr_maxfd = 0;
    FD_ZERO(&ctx->rdr_fdset);
@@ -398,11 +418,23 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
       dump_rdr_packet(stderr, &pkt);
       if (ctx->opts.verbose >= 50)
 	 dump_raw_rdr_packet(stderr, 0, raw_pkt, raw_pkt_size);
+      if (pkt.header.tag == TRANSACTION_USAGE_RDR) {
+	 unsigned filtered = is_ip_filtered(ctx, pkt.rdr.transaction_usage.client_ip.s_addr, pkt.rdr.transaction_usage.server_ip.s_addr);
+	 if (filtered & 0x01) {
+	    fprintf(stderr, "Client IP Filtered ");
+	 }
+	 if (filtered & 0x02) {
+	    fprintf(stderr, "Server IP Filtered ");
+	 }
+      }
       fprintf(stderr, "\n");
    }
 
    /* Not intersted in  */
    if (pkt.header.tag != TRANSACTION_USAGE_RDR)
+      return 0;
+
+   if (is_ip_filtered(ctx, pkt.rdr.transaction_usage.client_ip.s_addr, pkt.rdr.transaction_usage.server_ip.s_addr))
       return 0;
 
    duration = (pkt.rdr.transaction_usage.millisec_duration / 1000)
@@ -651,6 +683,111 @@ static struct rdr_session_ctx_t *remove_session(struct ctx_t *ctx, struct rdr_se
    return res;
 }
 
+static inline unsigned is_ip_filtered(struct ctx_t *ctx, in_addr_t src_ip, in_addr_t dst_ip)
+{
+   unsigned res;
+   struct ipfilter_item_t *f;
+
+   assert(ctx);
+
+   res = 0;
+   for(f=ctx->opts.ip_filter; f != NULL; f = f->next) {
+      if ( f->net == (src_ip & f->mask))
+	 res |= 0x01;
+      if ( f->net == (dst_ip & f->mask))
+	 res |= 0x02;
+   }
+
+   return res;
+}
+
+static int ip_filter_add_networks(struct ctx_t *ctx, char *optarg)
+{
+   char *saveptr;
+   const char *token;
+   int cnt;
+   int masklen;
+   struct in_addr ip;
+   struct ipfilter_item_t *filter;
+   struct ipfilter_item_t **tail_p;
+
+   assert(ctx);
+
+   if (optarg == NULL || (optarg[0] == '\0')) {
+      fprintf(stderr, "IP filter not defined\n");
+      return -1;
+   }
+
+   tail_p = &ctx->opts.ip_filter;
+   while (*tail_p != NULL) {
+      tail_p = &(*tail_p)->next;
+   }
+
+   cnt = 0;
+   token = strtok_r(optarg, ",", &saveptr);
+   while (token != NULL) {
+      masklen = inet_net_pton(AF_INET, token, &ip, sizeof(ip));
+      if (masklen <= 0) {
+	 fprintf(stderr, "Wrong IP/network %s\n", token);
+	 break;
+      }
+      filter = (struct ipfilter_item_t *)malloc(sizeof(*filter));
+      if (filter == NULL) {
+	 perror("malloc() error");
+	 break;
+      }
+      filter->next = NULL;
+      filter->mask = htonl(0 - (1 << (32-masklen)));
+      filter->net = ip.s_addr & filter->mask;
+
+      *tail_p = filter;
+      tail_p = &filter->next;
+
+      cnt += 1;
+      token = strtok_r(NULL, ",", &saveptr);
+   }
+
+   if (token != NULL)
+      return -1;
+
+   if (cnt == 0) {
+      fprintf(stderr, "Empty IP filter `%s`\n", optarg);
+      return -1;
+   }
+
+   return cnt;
+}
+
+static void ip_filter_print(struct ctx_t *ctx)
+{
+   struct ipfilter_item_t *f;
+
+   assert(ctx);
+   if (ctx->opts.ip_filter == NULL)
+      return;
+
+   fprintf(stderr, "IP networkds Excluded from dump: ");
+   for (f=ctx->opts.ip_filter; f != NULL; f = f->next) {
+      int bits;
+      unsigned mask;
+      struct in_addr addr;
+      char n0[30];
+
+      mask = f->mask;
+      bits=0;
+      while (mask != 0) {
+	 mask &= mask-1;
+	 bits += 1;
+      }
+
+      n0[0] = 0;
+      addr.s_addr = f->net;
+      inet_net_ntop(AF_INET, &addr, bits, n0, sizeof(n0));
+      fprintf(stderr, "%s%s", n0, f->next == NULL ? "\n" : ", ");
+   }
+
+}
+
 int main(int argc, char *argv[])
 {
    signed char c;
@@ -665,6 +802,7 @@ int main(int argc, char *argv[])
       {NULL,      required_argument, 0, 'p'},
       {NULL,      required_argument, 0, 'd'},
       {NULL,      required_argument, 0, 'P'},
+      {NULL,      required_argument, 0, 'F'},
       {NULL,      required_argument, 0, 'R'},
       {NULL,      required_argument, 0, 'b'},
       {0, 0, 0, 0}
@@ -673,7 +811,7 @@ int main(int argc, char *argv[])
    ctx = init_ctx();
    assert(ctx);
 
-   while ((c = getopt_long(argc, argv, "vhV:s:p:d:P:R:b:",longopts,NULL)) != -1) {
+   while ((c = getopt_long(argc, argv, "vhV:s:p:d:P:R:b:F:",longopts,NULL)) != -1) {
       switch (c) {
 	 case 's':
 	    if (inet_aton(optarg, &ctx->opts.src_addr) <= 0) {
@@ -709,6 +847,12 @@ int main(int argc, char *argv[])
 	    break;
 	 case 'R':
 	    if (rdr_repeater_add_endpoint(ctx->rdr_repeater, optarg, stderr) < 0) {
+	       free_ctx(ctx);
+	       return 1;
+	    }
+	    break;
+	 case 'F':
+	    if (ip_filter_add_networks(ctx, optarg) < 0) {
 	       free_ctx(ctx);
 	       return 1;
 	    }
@@ -759,6 +903,10 @@ int main(int argc, char *argv[])
       free_ctx(ctx);
       return -1;
    }
+
+   /* IP filter */
+   if (ctx->opts.verbose)
+      ip_filter_print(ctx);
 
    signal(SIGHUP, sig_quit);
    signal(SIGINT, sig_quit);
