@@ -11,7 +11,7 @@ clean:
 
 rdr2netflow: rdr.h netflow.h repeater.h rdr.c repeater.c rdr2netflow.c
 	$(CC) $(CFLAGS) $(LDFLAGS) rdr2netflow.c rdr.c repeater.c \
-	   -o rdr2netflow
+	   -o rdr2netflow -Wl,--as-needed -lrt
 
 install:
 	mkdir -p ${DESTDIR}/bin 2> /dev/null

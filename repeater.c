@@ -582,7 +582,7 @@ static int buffered_write(struct rdr_repeater_ctx_t *ctx, struct endpoint_t *ep,
       if (sizeof(ep->buf) < data_size) {
 	 if (ctx->verbose >= 10)
 	    fprintf(stderr, "%s %s Buffer overflow. %u bytes packet skipped\n",
-		  TAG, get_endpoint_name(ep), data_size);
+		  TAG, get_endpoint_name(ep), (unsigned)data_size);
 	 return 0;
       }
 
