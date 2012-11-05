@@ -261,12 +261,12 @@ static int open_socket(struct rdr_repeater_ctx_t *ctx, struct endpoint_t *ep)
    assert(ep->addrinfo != NULL);
    assert(ep->cur_addr != NULL);
 
-   if (ctx->verbose)
+   if (ctx->verbose > 1)
       fprintf(stderr, "%s Trying %s...\n", TAG, get_endpoint_name(ep));
    ep->s = socket(ep->cur_addr->ai_family,
 	 ep->cur_addr->ai_socktype, ep->cur_addr->ai_protocol);
    if (ep->s < 0) {
-      if (ctx->verbose)
+      if (ctx->verbose > 1)
 	 fprintf(stderr, "%s Socket() error: %s\n", TAG, strerror(errno));
       return -1;
    }
@@ -275,10 +275,8 @@ static int open_socket(struct rdr_repeater_ctx_t *ctx, struct endpoint_t *ep)
    if (ctx->s_bufsize > 0) {
       unsigned sndbuf;
       sndbuf = ctx->s_bufsize;
-      if (ctx->verbose)
-	 fprintf(stderr, "%s SO_SNDBUF=%u\n",TAG,  sndbuf);
       if (setsockopt(ep->s, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
-	 perror("setsockopt(SO_RCVBUF) error");
+	 perror("setsockopt(SO_SNDBUF) error");
 	 close(ep->s);
 	 ep->s = -1;
 	 return -1;
@@ -293,7 +291,7 @@ static int open_socket(struct rdr_repeater_ctx_t *ctx, struct endpoint_t *ep)
    ep->status = S_CONNECTING;
    if (connect(ep->s, ep->cur_addr->ai_addr, ep->cur_addr->ai_addrlen) < 0) {
       if (errno != EINPROGRESS) {
-	 if (ctx->verbose)
+	 if (ctx->verbose > 1)
 	    fprintf(stderr, "%s connect(%s) error: %s\n", TAG, get_endpoint_name(ep),
 		  strerror(errno));
 	 close(ep->s);
@@ -335,7 +333,7 @@ static int finish_socket_opening(struct rdr_repeater_ctx_t *ctx, struct endpoint
 	    error = errno;
       }else
 	 error = errno;
-      if (ctx->verbose)
+      if (ctx->verbose > 1)
 	 fprintf(stderr, "%s connect(%s) error: %s\n", TAG, get_endpoint_name(ep), strerror(error));
       return -1;
    }else {
@@ -406,6 +404,13 @@ int rdr_repeater_init_connection(struct rdr_repeater_ctx_t *ctx, unsigned socket
 
    ctx->s_bufsize = socket_buf_size;
    ctx->verbose = verbose;
+
+   if (ctx->verbose && (ctx->head != NULL)) {
+      fprintf(stderr, "Repeat all incoming TCP packets to hosts: ");
+      for (ep = ctx->head; ep != NULL; ep = ep->next) {
+	 fprintf(stderr, "%s%s", get_endpoint_name(ep), ep->next == NULL ? "\n" : ", ");
+      }
+   }
 
    for (ep = ctx->head; ep != NULL; ep = ep->next) {
       purge_buffer(ep);

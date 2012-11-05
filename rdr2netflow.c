@@ -167,6 +167,7 @@ static struct ctx_t *init_ctx()
    Ctx.opts.src_port = 0;
    Ctx.opts.dst_port = 0;
    Ctx.opts.s_bufsize = 0;
+   Ctx.opts.verbose = 1;
    Ctx.opts.ip_filter = NULL;
    Ctx.rdr_sessions = NULL;
    Ctx.rdr_maxfd = 0;
