@@ -223,7 +223,11 @@ int rdr_repeater_add_endpoint(struct rdr_repeater_ctx_t *ctx, const char *addrpo
    memset(&hints, 0, sizeof(hints));
    hints.ai_family = PF_INET;
    hints.ai_socktype = SOCK_STREAM;
+#ifdef AI_ADDRCONFIG
    hints.ai_flags = AI_ADDRCONFIG;
+#else
+   hints.ai_flags = 0;
+#endif
    error = getaddrinfo(ep->hostname, ep->servname, &hints, &ep->addrinfo);
    if (error) {
       if (err_stream != NULL) fprintf(err_stream, "%s getaddrinfo(%s) error: %s\n",
