@@ -912,6 +912,7 @@ int main(int argc, char *argv[])
    signal(SIGHUP, sig_quit);
    signal(SIGINT, sig_quit);
    signal(SIGTERM, sig_quit);
+   signal(SIGPIPE, SIG_IGN);
 
    for (;!quit;) {
       struct rdr_session_ctx_t *session;
@@ -970,6 +971,7 @@ int main(int argc, char *argv[])
    signal(SIGHUP, SIG_DFL);
    signal(SIGINT, SIG_DFL);
    signal(SIGTERM, SIG_DFL);
+   signal(SIGPIPE, SIG_DFL);
 
    flush_all_netflow_sessions(ctx);
    free_ctx(ctx);
