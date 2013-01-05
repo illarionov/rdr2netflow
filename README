@@ -9,7 +9,7 @@ RDR 2 Netflow
 
    $ git clone git://github.com/littlesavage/rdr2netflow.git
    $ cd rdr2netflow
-   $ make
+   $ make (во FreeBSD нужно использовать gmake)
    $ su
    # make install
 
