@@ -64,9 +64,9 @@ int is_rdr_packet(void *data, size_t data_size)
 
    buf = (uint8_t *)data;
 
-   /*  ? */
-   if (buf[0] < 0x01 || buf[0] > 0x04)
-      return 0;
+   /*  ??? XXX: wrong */
+//   if (buf[0] < 0x01 || buf[0] > 0xff)
+//      return 0;
 
    if (data_size < 5)
       return -1;
