@@ -961,6 +961,7 @@ int main(int argc, char *argv[])
 	 }
 
 	 if ( read_data(ctx, session) < 0) {
+	    flush_netflow_dgram(ctx, session);
 	    session = remove_session(ctx, session);
 	 }else
 	    session = session->next;
