@@ -478,8 +478,19 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
 
    rc = &dg->r[session->netflow.records_count++];
    dg->header.count = htons((uint16_t)session->netflow.records_count);
-   rc->src_addr = pkt.rdr.transaction_usage.client_ip.s_addr;
-   rc->dst_addr = pkt.rdr.transaction_usage.server_ip.s_addr;
+   /* If initiating_side 0 - Subscriber side; 1 - Network side. Change direction */
+   if (pkt.rdr.transaction_usage.initiating_side == 0) {
+      rc->src_addr = pkt.rdr.transaction_usage.client_ip.s_addr;
+      rc->dst_addr = pkt.rdr.transaction_usage.server_ip.s_addr;
+      rc->s_port = htons(pkt.rdr.transaction_usage.client_port);
+      rc->d_port = htons(pkt.rdr.transaction_usage.server_port);
+   }
+   else {
+      rc->dst_addr = pkt.rdr.transaction_usage.client_ip.s_addr;
+      rc->src_addr = pkt.rdr.transaction_usage.server_ip.s_addr;
+      rc->d_port = htons(pkt.rdr.transaction_usage.client_port);
+      rc->s_port = htons(pkt.rdr.transaction_usage.server_port);
+   }   
    rc->next_hop = 0;
    rc->i_ifx = 0;
    rc->o_ifx = 0;
@@ -487,8 +498,6 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
    rc->octets = htonl(pkt.rdr.transaction_usage.session_upstream_volume);
    rc->first =  htonl((uint32_t)(uptime - pkt.rdr.transaction_usage.millisec_duration));
    rc->last = htonl((uint32_t)uptime);
-   rc->s_port = htons(pkt.rdr.transaction_usage.client_port);
-   rc->d_port = htons(pkt.rdr.transaction_usage.server_port);
    rc->pad1 = 0;
    rc->flags = 0; //* XXX  */
    rc->prot = pkt.rdr.transaction_usage.ip_protocol;
@@ -503,8 +512,19 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
    dg->header.flow_seq = htonl(++session->netflow.flow_seq);
    rc = &dg->r[session->netflow.records_count++];
    dg->header.count = htons((uint16_t)session->netflow.records_count);
-   rc->src_addr = pkt.rdr.transaction_usage.server_ip.s_addr;
-   rc->dst_addr = pkt.rdr.transaction_usage.client_ip.s_addr;
+   /* If initiating_side 0 - Subscriber side; 1 - Network side. Change direction */
+   if (pkt.rdr.transaction_usage.initiating_side == 0) {
+      rc->src_addr = pkt.rdr.transaction_usage.server_ip.s_addr;
+      rc->dst_addr = pkt.rdr.transaction_usage.client_ip.s_addr;
+      rc->s_port = htons(pkt.rdr.transaction_usage.server_port);
+      rc->d_port = htons(pkt.rdr.transaction_usage.client_port);
+   }
+   else {
+      rc->dst_addr = pkt.rdr.transaction_usage.server_ip.s_addr;
+      rc->src_addr = pkt.rdr.transaction_usage.client_ip.s_addr;
+      rc->d_port = htons(pkt.rdr.transaction_usage.server_port);
+      rc->s_port = htons(pkt.rdr.transaction_usage.client_port);
+   }
    rc->next_hop = 0;
    rc->i_ifx = 0;
    rc->o_ifx = 0;
@@ -512,8 +532,6 @@ static int handle_rdr_packet(struct ctx_t *ctx, struct rdr_session_ctx_t *sessio
    rc->octets = htonl(pkt.rdr.transaction_usage.session_downstream_volume);
    rc->first =  htonl((uint32_t)(uptime - pkt.rdr.transaction_usage.millisec_duration));
    rc->last = htonl((uint32_t)uptime);
-   rc->s_port = htons(pkt.rdr.transaction_usage.server_port);
-   rc->d_port = htons(pkt.rdr.transaction_usage.client_port);
    rc->pad1 = 0;
    rc->flags = 0;
    rc->prot = pkt.rdr.transaction_usage.ip_protocol;
